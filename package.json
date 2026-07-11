@@ -1,10 +1,10 @@
 {
-  "type": "Feature",
-  "geometry": { "type": "Point", "coordinates": [-58.38, -34.60] },
-  "properties": {
-    "userId": "123",
-    "speed": 45,
-    "status": "driving",
-    "traffic_index": 0.8
+  "name": "waze-clone-pro",
+  "version": "1.0.0",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.18.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0"
   }
 }
