@@ -4,21 +4,19 @@ app.use(express.json());
 app.use(express.static('public'));
 
 let users = {};
+let reports = []; // {type: 'accidente', lat, lng, time}
 
 app.post('/update', (req, res) => {
-    const { id, lat, lng, speed } = req.body;
-    users[id] = { lat, lng, speed, time: Date.now() };
+    const { id, lat, lng, report } = req.body;
+    users[id] = { lat, lng, time: Date.now() };
+    if (report) reports.push({ ...report, lat, lng, time: Date.now() });
     res.sendStatus(200);
 });
 
-app.get('/all', (req, res) => {
+app.get('/data', (req, res) => {
     const now = Date.now();
-    // Limpieza de inactivos
-    for (let id in users) {
-        if (now - users[id].time > 15000) delete users[id];
-    }
-    res.json(users);
+    reports = reports.filter(r => now - r.time < 3600000); // 1 hora de vigencia
+    res.json({ users, reports });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Servidor corriendo en puerto ' + PORT));
+app.listen(process.env.PORT || 3000);
