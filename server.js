@@ -1,22 +1,21 @@
-const express = require('express');
-const app = express();
-app.use(express.json());
-app.use(express.static('public'));
+// 1. WebSocket para baja latencia (Socket.io)
+const io = require('socket.io')(server);
 
-let users = {};
-let reports = []; // {type: 'accidente', lat, lng, time}
+// 2. Filtro de Kalman para suavizado
+const KalmanFilter = require('kalmanjs');
+const kf = new KalmanFilter();
 
-app.post('/update', (req, res) => {
-    const { id, lat, lng, report } = req.body;
-    users[id] = { lat, lng, time: Date.now() };
-    if (report) reports.push({ ...report, lat, lng, time: Date.now() });
-    res.sendStatus(200);
+io.on('connection', (socket) => {
+    socket.on('update-pos', (data) => {
+        // Aplicar filtro de Kalman
+        const smoothLat = kf.filter(data.lat);
+        const smoothLng = kf.filter(data.lng);
+        
+        // Broadcast a usuarios cercanos (usando un radio de 5km)
+        socket.broadcast.emit('user-moved', {
+            id: socket.id,
+            lat: smoothLat,
+            lng: smoothLng
+        });
+    });
 });
-
-app.get('/data', (req, res) => {
-    const now = Date.now();
-    reports = reports.filter(r => now - r.time < 3600000); // 1 hora de vigencia
-    res.json({ users, reports });
-});
-
-app.listen(process.env.PORT || 3000);
