@@ -1,21 +1,20 @@
-// 1. WebSocket para baja latencia (Socket.io)
-const io = require('socket.io')(server);
+const express = require('express');
+const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 
-// 2. Filtro de Kalman para suavizado
-const KalmanFilter = require('kalmanjs');
-const kf = new KalmanFilter();
-
+// Gestión de usuarios con WebSockets
 io.on('connection', (socket) => {
-    socket.on('update-pos', (data) => {
-        // Aplicar filtro de Kalman
-        const smoothLat = kf.filter(data.lat);
-        const smoothLng = kf.filter(data.lng);
-        
-        // Broadcast a usuarios cercanos (usando un radio de 5km)
-        socket.broadcast.emit('user-moved', {
-            id: socket.id,
-            lat: smoothLat,
-            lng: smoothLng
+    socket.on('send-location', (data) => {
+        // En lugar de guardar en un objeto simple, 
+        // aquí es donde consultarías PostGIS para obtener solo los cercanos
+        socket.broadcast.emit('user-update', { 
+            id: socket.id, 
+            lat: data.lat, 
+            lng: data.lng,
+            speed: data.speed 
         });
     });
 });
+
+http.listen(3000, () => console.log('Servidor de navegación profesional activo'));
