@@ -4,21 +4,21 @@ app.use(express.json());
 app.use(express.static('public'));
 
 let users = {};
-let trafficEvents = []; // Almacena reportes (accidentes, obras)
 
-// Endpoint para actualizar posición y estado
 app.post('/update', (req, res) => {
-    const { id, lat, lng, speed, report } = req.body;
-    users[id] = { lat, lng, speed, timestamp: Date.now() };
-    if (report) trafficEvents.push({ ...report, lat, lng, time: Date.now() });
+    const { id, lat, lng, speed } = req.body;
+    users[id] = { lat, lng, speed, time: Date.now() };
     res.sendStatus(200);
 });
 
-// Endpoint para sincronización total
-app.get('/sync', (req, res) => {
-    // Filtrar eventos de más de 30 mins
-    trafficEvents = trafficEvents.filter(e => Date.now() - e.time < 1800000);
-    res.json({ users, trafficEvents });
+app.get('/all', (req, res) => {
+    const now = Date.now();
+    // Limpieza de inactivos
+    for (let id in users) {
+        if (now - users[id].time > 15000) delete users[id];
+    }
+    res.json(users);
 });
 
-app.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log('Servidor corriendo en puerto ' + PORT));
