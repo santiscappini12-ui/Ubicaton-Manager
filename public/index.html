@@ -1,66 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Ubicaton Pro</title>
+    <title>Waze Clone Pro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
     <style>
-        body { margin: 0; }
-        #map { height: 100vh; width: 100%; }
-        .controls { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 10px; }
+        #map { height: 100vh; }
+        .hud { position: absolute; top: 20px; left: 20px; z-index: 1000; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; }
     </style>
 </head>
 <body>
-    <div class="controls">Sistema de Navegación Activo</div>
+    <div class="hud" id="hud">Esperando GPS...</div>
     <div id="map"></div>
-
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
     <script>
-        const map = L.map('map').setView([-34.60, -58.38], 13);
+        const map = L.map('map').setView([-34.60, -58.38], 15);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        const myId = Math.random().toString(36).substr(2, 9);
-        let myMarker, routingControl;
-        const others = {};
-
-        // 1. Geolocalización y envío al servidor
+        let myMarker, control;
+        
         navigator.geolocation.watchPosition(async (pos) => {
             const { latitude: lat, longitude: lng } = pos.coords;
-            if (!myMarker) myMarker = L.marker([lat, lng]).addTo(map).bindPopup("Yo");
+            if(!myMarker) myMarker = L.marker([lat, lng]).addTo(map);
             else myMarker.setLatLng([lat, lng]);
 
             await fetch('/update', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: myId, lat, lng, speed: pos.coords.speed })
+                body: JSON.stringify({ id: 'me', lat, lng })
             });
         });
 
-        // 2. Traer a los demás
-        setInterval(async () => {
-            const res = await fetch('/all');
-            const data = await res.json();
-            for (let id in data) {
-                if (id === myId) continue;
-                if (!others[id]) others[id] = L.marker([data[id].lat, data[id].lng], {
-                    icon: L.divIcon({ html: '<div style="background:red;width:12px;height:12px;border-radius:50%"></div>' })
-                }).addTo(map);
-                else others[id].setLatLng([data[id].lat, data[id].lng]);
-            }
-        }, 2000);
-
-        // 3. Routing avanzado al hacer click
         map.on('click', (e) => {
-            if (routingControl) map.removeControl(routingControl);
-            routingControl = L.Routing.control({
-                waypoints: [
-                    myMarker.getLatLng(),
-                    e.latlng
-                ],
+            if(control) map.removeControl(control);
+            control = L.Routing.control({
+                waypoints: [myMarker.getLatLng(), e.latlng],
                 router: L.Routing.osrmv1()
+            }).on('routesfound', (e) => {
+                const route = e.routes[0];
+                const eta = Math.round(route.summary.totalTime / 60);
+                document.getElementById('hud').innerHTML = `Llegada: ${eta} min | ${Math.round(route.summary.totalDistance/1000)} km`;
             }).addTo(map);
         });
+
+        // Sincronizar usuarios y eventos
+        setInterval(async () => {
+            const res = await fetch('/data');
+            const { users, reports } = await res.json();
+            // Lógica para renderizar puntos rojos y reportes
+            reports.forEach(r => L.marker([r.lat, r.lng]).bindPopup(r.type).addTo(map));
+        }, 3000);
     </script>
 </body>
 </html>
