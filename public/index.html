@@ -1,40 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Ubicaton Pro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <style>#map { height: 100vh; }</style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <style>
+        body { margin: 0; }
+        #map { height: 100vh; width: 100%; }
+        .controls { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 10px; }
+    </style>
 </head>
 <body>
+    <div class="controls">Sistema de Navegación Activo</div>
     <div id="map"></div>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-        const map = L.map('map').setView([0, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        
-        const myId = Math.random().toString(36).substr(2, 9);
-        const markers = {};
 
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+    <script>
+        const map = L.map('map').setView([-34.60, -58.38], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        const myId = Math.random().toString(36).substr(2, 9);
+        let myMarker, routingControl;
+        const others = {};
+
+        // 1. Geolocalización y envío al servidor
         navigator.geolocation.watchPosition(async (pos) => {
             const { latitude: lat, longitude: lng } = pos.coords;
+            if (!myMarker) myMarker = L.marker([lat, lng]).addTo(map).bindPopup("Yo");
+            else myMarker.setLatLng([lat, lng]);
+
             await fetch('/update', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: myId, lat, lng })
+                body: JSON.stringify({ id: myId, lat, lng, speed: pos.coords.speed })
             });
-            map.setView([lat, lng], 15);
         });
 
+        // 2. Traer a los demás
         setInterval(async () => {
             const res = await fetch('/all');
             const data = await res.json();
             for (let id in data) {
                 if (id === myId) continue;
-                if (!markers[id]) markers[id] = L.marker([data[id].lat, data[id].lng], {
-                    icon: L.divIcon({ html: '<div style="background:red;width:15px;height:15px;border-radius:50%"></div>' })
+                if (!others[id]) others[id] = L.marker([data[id].lat, data[id].lng], {
+                    icon: L.divIcon({ html: '<div style="background:red;width:12px;height:12px;border-radius:50%"></div>' })
                 }).addTo(map);
-                else markers[id].setLatLng([data[id].lat, data[id].lng]);
+                else others[id].setLatLng([data[id].lat, data[id].lng]);
             }
         }, 2000);
+
+        // 3. Routing avanzado al hacer click
+        map.on('click', (e) => {
+            if (routingControl) map.removeControl(routingControl);
+            routingControl = L.Routing.control({
+                waypoints: [
+                    myMarker.getLatLng(),
+                    e.latlng
+                ],
+                router: L.Routing.osrmv1()
+            }).addTo(map);
+        });
     </script>
 </body>
 </html>
