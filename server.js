@@ -1,23 +1,24 @@
 const express = require('express');
 const app = express();
 app.use(express.json());
-app.use(express.static('public')); // Esto sirve tus archivos HTML
+app.use(express.static('public'));
 
 let users = {};
+let trafficEvents = []; // Almacena reportes (accidentes, obras)
 
+// Endpoint para actualizar posición y estado
 app.post('/update', (req, res) => {
-    const { id, lat, lng } = req.body;
-    users[id] = { lat, lng, time: Date.now() };
+    const { id, lat, lng, speed, report } = req.body;
+    users[id] = { lat, lng, speed, timestamp: Date.now() };
+    if (report) trafficEvents.push({ ...report, lat, lng, time: Date.now() });
     res.sendStatus(200);
 });
 
-app.get('/all', (req, res) => {
-    const now = Date.now();
-    for (let id in users) {
-        if (now - users[id].time > 10000) delete users[id];
-    }
-    res.json(users);
+// Endpoint para sincronización total
+app.get('/sync', (req, res) => {
+    // Filtrar eventos de más de 30 mins
+    trafficEvents = trafficEvents.filter(e => Date.now() - e.time < 1800000);
+    res.json({ users, trafficEvents });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Servidor iniciado'));
+app.listen(process.env.PORT || 3000);
