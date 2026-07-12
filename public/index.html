@@ -1,26 +1,61 @@
-<div class="search-box" style="position:absolute; top:10px; z-index:1000; left:50px;">
-    <input type="text" id="address" placeholder="Buscar destino...">
-    <button onclick="buscarDestino()">Ir</button>
-</div>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ubicaton Pro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <style>
+        body { margin:0; } #map { height: 100vh; }
+        .ui { position: absolute; top: 10px; left: 50px; z-index: 1000; }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <input type="text" id="dest" placeholder="Buscar destino...">
+        <button onclick="buscar()">Ir</button>
+    </div>
+    <div id="map"></div>
 
-<script>
-    // 1. Lógica de búsqueda
-    async function buscarDestino() {
-        const query = document.getElementById('address').value;
-        const res = await fetch(`/search?q=${query}`);
-        const data = await res.json();
-        if(data.length > 0) {
-            const { lat, lon } = data[0];
-            map.flyTo([lat, lon], 18); // Zoom 18 es "modo casa"
-        }
-    }
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+    <script>
+        const socket = io();
+        const map = L.map('map').setView([0, 0], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // 2. Acercamiento Infinito (Modo Precisión)
-    // Cuando el usuario hace zoom máximo, el mapa carga capas vectoriales
-    map.on('zoomend', () => {
-        if (map.getZoom() > 18) {
-            // Aquí activarías una capa de "Edificios en 3D" o plano interno
-            console.log("Modo Precisión Activo");
+        let myMarker, routingControl;
+        const others = {};
+
+        // 1. Geolocalización precisa
+        navigator.geolocation.watchPosition((pos) => {
+            const { latitude: lat, longitude: lng } = pos.coords;
+            if(!myMarker) myMarker = L.marker([lat, lng]).addTo(map);
+            else myMarker.setLatLng([lat, lng]);
+            socket.emit('update-location', { lat, lng });
+        }, null, { enableHighAccuracy: true });
+
+        // 2. Otros usuarios
+        socket.on('user-moved', (data) => {
+            if(!others[data.id]) others[data.id] = L.circleMarker([data.lat, data.lng], {color: 'red'}).addTo(map);
+            else others[data.id].setLatLng([data.lat, data.lng]);
+        });
+
+        // 3. Buscar destino
+        async function buscar() {
+            const q = document.getElementById('dest').value;
+            const res = await fetch('/search?q=' + q);
+            const data = await res.json();
+            if(data.length > 0) {
+                const { lat, lon } = data[0];
+                map.flyTo([lat, lon], 18);
+                if(routingControl) map.removeControl(routingControl);
+                routingControl = L.Routing.control({
+                    waypoints: [myMarker.getLatLng(), L.latLng(lat, lon)],
+                    router: L.Routing.osrmv1()
+                }).addTo(map);
+            }
         }
-    });
-</script>
+    </script>
+</body>
+</html>
