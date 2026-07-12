@@ -23,18 +23,29 @@
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script>
         const socket = io();
-        const map = L.map('map').setView([-34.60, -58.38], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        // Inicialización forzada
+        const map = L.map('map', { preferCanvas: true }).setView([-34.60, -58.38], 15);
+        
+        // Uso de una URL de tiles más confiable
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
 
         let myMarker, routingControl;
         const others = {};
 
+        // Forzar ubicación
         navigator.geolocation.watchPosition((pos) => {
-            const { latitude: lat, longitude: lng } = pos.coords;
-            if(!myMarker) myMarker = L.marker([lat, lng]).addTo(map);
-            else myMarker.setLatLng([lat, lng]);
-            socket.emit('update-location', { lat, lng });
-        }, null, { enableHighAccuracy: true });
+            const { latitude, longitude } = pos.coords;
+            if(!myMarker) {
+                myMarker = L.marker([latitude, longitude]).addTo(map);
+                map.setView([latitude, longitude], 15);
+            } else {
+                myMarker.setLatLng([latitude, longitude]);
+            }
+            socket.emit('update-location', { lat: latitude, lng: longitude });
+        }, (err) => console.error("Error GPS:", err), { enableHighAccuracy: true });
 
         socket.on('user-moved', (data) => {
             if(!others[data.id]) others[data.id] = L.circleMarker([data.lat, data.lng], {color: 'red'}).addTo(map);
