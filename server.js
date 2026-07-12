@@ -8,12 +8,9 @@ app.use(express.static('public'));
 app.use(express.json());
 
 app.get('/search', async (req, res) => {
-    try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(req.query.q)}`;
-        const response = await fetch(url, { headers: {'User-Agent': 'Ubicaton-Pro'} });
-        const data = await response.json();
-        res.json(data);
-    } catch (e) { res.status(500).json([]); }
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(req.query.q)}`;
+    const response = await fetch(url, { headers: {'User-Agent': 'Ubicaton-Pro'} });
+    res.json(await response.json());
 });
 
 io.on('connection', (socket) => {
@@ -22,4 +19,4 @@ io.on('connection', (socket) => {
     });
 });
 
-http.listen(process.env.PORT || 3000, () => console.log('Servidor en puerto 3000'));
+http.listen(process.env.PORT || 3000);
